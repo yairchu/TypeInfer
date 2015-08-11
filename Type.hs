@@ -1078,12 +1078,20 @@ inferLeaf leaf =
         Nothing -> throwError $ VarNotInScope n
     <&> inferRes (BLeaf leaf)
 
+typeOfPos :: UnificationPos tag -> Infer s (UnifiableTypeAST tag)
+typeOfPos pos =
+    repr pos <&> \case
+    (x, Unbound _) -> UnifiableTypeVar x
+    (_, Bound res) -> UnifiableTypeAST res
+
 inferLam :: Abs V -> Infer s InferResult
 inferLam (Abs n body) =
     {-# SCC "inferLam" #-}
     do
-        nType <- freshTVar TypeConstraints
-        (body', resType) <- infer body & localScope (insertLocal n nType)
+        nPos <- freshPos TypeConstraints
+        (body', resType) <-
+            infer body & localScope (insertLocal n (UnifiableTypeVar nPos))
+        nType <- typeOfPos nPos
         TFun nType resType & UnifiableTypeAST
             & inferRes (BLam (Abs n body')) & return
 
